@@ -1,13 +1,12 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
+import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:uuid/uuid.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:timer_count_down/timer_count_down.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() {
   initializeDateFormatting().then((_) => runApp(const MyApp()));
@@ -18,27 +17,31 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
+      initialRoute: '/',
+      getPages: [
+    GetPage(name: '/:url', page: () => const ChatPage()),],
       theme: ThemeData(
         primaryColor: const DarkChatTheme().primaryColor,
         secondaryHeaderColor: const DarkChatTheme().secondaryColor,
         brightness: Brightness.dark,
       ),
       debugShowCheckedModeBanner: false,
-      home: ChatPage(),
-    );
-  }
+  );
+}
 }
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({Key? key}) : super(key: key);
-
+  const ChatPage({
+    Key? key,
+  }) : super(key: key);
   @override
   _ChatPageState createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
-  List<types.Message> _messages = [];
+  
+  final List<types.Message> _messages = [];
   final _users = const [
     types.User(id: '273948723482347', firstName: "Anonymous"),
     types.User(id: '12345698765432', firstName: "You")
@@ -48,9 +51,11 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    var data = Get.parameters;
+    String? urlPart = data.containsKey('url') ? data['url'] :'';
     _currentUser = _users.last;
     channel = WebSocketChannel.connect(
-      Uri.parse('ws://966d-34-86-37-67.ngrok.io/'),
+      Uri.parse('ws://${urlPart ?? ""}.ngrok.io/'),
     );
     channel.stream.listen((snapshot) {
       final textMessage = types.TextMessage(
