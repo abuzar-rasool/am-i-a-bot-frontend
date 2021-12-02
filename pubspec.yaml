@@ -52,6 +52,9 @@ dev_dependencies:
   mime: ^1.0.1
   open_file: ^3.2.1
   uuid: ^3.0.5
+  timer_count_down: ^2.2.0
+  url_launcher: ^6.0.17
+  web_socket_channel: ^2.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

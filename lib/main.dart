@@ -1,14 +1,13 @@
 import 'dart:convert';
-import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:mime/mime.dart';
-import 'package:open_file/open_file.dart';
 import 'package:uuid/uuid.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:timer_count_down/timer_count_down.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   initializeDateFormatting().then((_) => runApp(const MyApp()));
@@ -40,26 +39,32 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   List<types.Message> _messages = [];
-  final _users = const [types.User(id: '273948723482347',firstName: "Anonymous"),types.User(id: '12345698765432',firstName: "Abuzar",lastName: "Rasool")]; 
+  final _users = const [
+    types.User(id: '273948723482347', firstName: "Anonymous"),
+    types.User(id: '12345698765432', firstName: "You")
+  ];
   late types.User _currentUser;
-
+  late WebSocketChannel channel;
   @override
   void initState() {
     super.initState();
-    _currentUser = _users.first;
-    _loadMessages();
-  }
-
-  void _addMessage(types.Message message) {
-    setState(() {
-      _messages.insert(0, message);
+    _currentUser = _users.last;
+    channel = WebSocketChannel.connect(
+      Uri.parse('ws://966d-34-86-37-67.ngrok.io/'),
+    );
+    channel.stream.listen((snapshot) {
+      final textMessage = types.TextMessage(
+        author: _users.first,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        id: const Uuid().v4(),
+        text: snapshot.toString(),
+      );
+      setState(() {
+        _messages.insert(0,textMessage);
+      });
     });
   }
-  void _handleMessageTap(types.Message message) async {
-    if (message is types.FileMessage) {
-      await OpenFile.open(message.uri);
-    }
-  }
+
 
   void _handlePreviewDataFetched(
     types.TextMessage message,
@@ -77,51 +82,59 @@ class _ChatPageState extends State<ChatPage> {
 
   void _handleSendPressed(types.PartialText message) {
     final textMessage = types.TextMessage(
-      author: _currentUser,
+      author: _users.last,
       createdAt: DateTime.now().millisecondsSinceEpoch,
       id: const Uuid().v4(),
       text: message.text,
     );
 
-    _addMessage(textMessage);
-  }
-
-  void _loadMessages() async {
-    final response = await rootBundle.loadString('assets/messages.json');
-    final messages = (jsonDecode(response) as List)
-        .map((e) => types.Message.fromJson(e as Map<String, dynamic>))
-        .toList();
-
     setState(() {
-      _messages = messages;
+      _messages.insert(0, textMessage);
+      channel.sink.add(message.text);
     });
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Row(
-        children:  [
-          const Text('Am I A Bot Or Not?'),
-          const Spacer(),
-           TextButton.icon(onPressed: (){
-             setState(() {
-               if(_currentUser==_users.first){
-                 _currentUser=_users.last;
-               }else{
-                 _currentUser=_users.first;
-               }
-             });
-           }, icon: const Icon(Icons.account_box), label: Text('Switch User',style: Theme.of(context).textTheme.caption,),),
-        ],
-      ),backgroundColor: const DarkChatTheme().inputBackgroundColor,),
+      appBar: AppBar(
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+             Text('Anonymous'),
+             SizedBox(width: 8),
+             Spacer(),
+             Countdown(
+              seconds: 180,
+              build: (BuildContext context, double time) => Text(
+                time.toStringAsFixed(0) + "s",
+                style: const TextStyle(color: Colors.white),
+              ),
+              interval: const Duration(milliseconds: 100),
+              onFinished: () async {
+                print('Timer is done!');
+                print('redirecting to survey');
+                channel.sink.close();
+                showDialog(  
+                  barrierDismissible: false,
+                context: context,  
+                builder: (BuildContext context) {  
+                  return AlertDialog(  
+                  title: Text("Chat Ended"),  
+                  content: Text("Thank you for your time."),    
+                );  
+                });  
+                await launch('https://google.com');
+              },
+            ),
+          ],
+        ),
+        backgroundColor: const DarkChatTheme().inputBackgroundColor,
+      ),
       body: SafeArea(
         bottom: true,
         child: Chat(
           showUserNames: true,
-          theme: const DarkChatTheme(),
           messages: _messages,
-          onMessageTap: _handleMessageTap,
           onPreviewDataFetched: _handlePreviewDataFetched,
           onSendPressed: _handleSendPressed,
           user: _currentUser,
